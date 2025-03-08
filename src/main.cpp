@@ -8,8 +8,15 @@
 
 using namespace std;
 
-int main() {
+int main(int argc, char *argv[]) {
 #ifdef GST_FOUND
+    if (argc != 2) {
+        cerr << "Usage: " << argv[0] << " <receiver_ip_address>" << endl;
+        return -1;
+    }
+
+    string receiver_ip = argv[1];
+
     GstElement *pipeline, *videosrc, *x264enc, *rtph264pay, *udpsink;
     GstStateChangeReturn ret;
     string video_device_path;
@@ -77,27 +84,11 @@ int main() {
 
     // Set properties
     g_object_set(videosrc, "device", video_device_path.c_str(), NULL); // Use the first found video device
-    g_object_set(udpsink, "host", "127.0.0.1", NULL); // Replace with the receiver's IP address
+    g_object_set(udpsink, "host", receiver_ip.c_str(), NULL); // Use the provided receiver's IP address
     g_object_set(udpsink, "port", 5000, NULL);      // Port for UDP streaming
 
-    // --- Optional: Configure the encoder (tune for performance) ---
-    // These are example settings; you might need to adjust them.
     g_object_set(x264enc, "bitrate", 500, NULL); // Bitrate in kbps
     g_object_set(x264enc, "tune", "zerolatency", NULL); // Optimize for low latency
-    // g_object_set(x264enc, "speed-preset", "ultrafast", NULL); //  Another way to control speed/quality
-
-    // --- Optional:  Set caps on the source (v4l2src) ---
-    // This is HIGHLY RECOMMENDED to avoid unnecessary format conversions.
-    // Get the capabilities of your camera using `v4l2-ctl --list-formats-ext`
-    // Example (replace with your camera's actual supported formats):
-    // GstCaps *caps = gst_caps_new_simple("video/x-raw",
-    //                                     "format", G_TYPE_STRING, "YUY2",
-    //                                     "width", G_TYPE_INT, 640,
-    //                                     "height", G_TYPE_INT, 480,
-    //                                     "framerate", GST_TYPE_FRACTION, 30, 1,
-    //                                     NULL);
-    // g_object_set(videosrc, "caps", caps, NULL);
-    // gst_caps_unref(caps); // Important: Release the caps object
 
 
     // Build the pipeline (link elements)
