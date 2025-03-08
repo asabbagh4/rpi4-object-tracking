@@ -1,4 +1,6 @@
 #include <iostream>
+#include <fstream> // For checking the video device
+#include <string>  // For constructing device paths
 
 #ifdef GST_FOUND // Conditional compilation
 #include <gst/gst.h>
@@ -10,6 +12,24 @@ int main() {
 #ifdef GST_FOUND
     GstElement *pipeline, *videosrc, *x264enc, *rtph264pay, *udpsink;
     GstStateChangeReturn ret;
+    string video_device_path;
+
+    // Check for available video devices
+    bool device_found = false;
+    for (int i = 0; i < 10; ++i) {
+        video_device_path = "/dev/video" + to_string(i);
+        ifstream video_device(video_device_path);
+        if (video_device) {
+            device_found = true;
+            video_device.close();
+            break;
+        }
+    }
+
+    if (!device_found) {
+        cerr << "ERROR: No video device found." << endl;
+        return -1;
+    }
 
     // Initialize GStreamer
     gst_init(NULL, NULL);
@@ -56,7 +76,7 @@ int main() {
     }
 
     // Set properties
-    g_object_set(videosrc, "device", "/dev/video0", NULL); // Adjust if your webcam is not /dev/video0
+    g_object_set(videosrc, "device", video_device_path.c_str(), NULL); // Use the first found video device
     g_object_set(udpsink, "host", "127.0.0.1", NULL); // Replace with the receiver's IP address
     g_object_set(udpsink, "port", 5000, NULL);      // Port for UDP streaming
 
