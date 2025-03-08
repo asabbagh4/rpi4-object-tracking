@@ -23,11 +23,12 @@ int main(int argc, char *argv[]) {
 
     // Check for available video devices
     bool device_found = false;
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 100; ++i) {
         video_device_path = "/dev/video" + to_string(i);
         ifstream video_device(video_device_path);
         if (video_device) {
             device_found = true;
+            clog << "Found video device: " << video_device_path << endl;
             video_device.close();
             break;
         }
