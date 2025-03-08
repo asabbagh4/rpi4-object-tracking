@@ -16,13 +16,42 @@ int main() {
 
     // Create pipeline elements
     pipeline = gst_pipeline_new("my-pipeline");
-    videosrc = gst_element_factory_make("v4l2src", "source");
-    x264enc = gst_element_factory_make("x264enc", "encoder");  // Software H.264 encoder
-    rtph264pay = gst_element_factory_make("rtph264pay", "payloader"); // RTP packetizer
-    udpsink = gst_element_factory_make("udpsink", "sink"); // UDP sink
+    if (!pipeline) {
+        cerr << "ERROR: Pipeline could not be created." << endl;
+        return -1;
+    }
 
-    if (!pipeline || !videosrc || !x264enc || !rtph264pay || !udpsink) {
-        cerr << "ERROR: Not all elements could be created." << endl;
+    videosrc = gst_element_factory_make("v4l2src", "source");
+    if (!videosrc) {
+        cerr << "ERROR: Video source element could not be created." << endl;
+        gst_object_unref(pipeline);
+        return -1;
+    }
+
+    x264enc = gst_element_factory_make("x264enc", "encoder");  // Software H.264 encoder
+    if (!x264enc) {
+        cerr << "ERROR: x264 encoder element could not be created." << endl;
+        gst_object_unref(pipeline);
+        gst_object_unref(videosrc);
+        return -1;
+    }
+
+    rtph264pay = gst_element_factory_make("rtph264pay", "payloader"); // RTP packetizer
+    if (!rtph264pay) {
+        cerr << "ERROR: RTP payloader element could not be created." << endl;
+        gst_object_unref(pipeline);
+        gst_object_unref(videosrc);
+        gst_object_unref(x264enc);
+        return -1;
+    }
+
+    udpsink = gst_element_factory_make("udpsink", "sink"); // UDP sink
+    if (!udpsink) {
+        cerr << "ERROR: UDP sink element could not be created." << endl;
+        gst_object_unref(pipeline);
+        gst_object_unref(videosrc);
+        gst_object_unref(x264enc);
+        gst_object_unref(rtph264pay);
         return -1;
     }
 
