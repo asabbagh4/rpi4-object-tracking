@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    x264enc = gst_element_factory_make("x264enc", "encoder");  // Software H.264 encoder
+    x264enc = gst_element_factory_make("v4l2h264enc", "encoder");  // Hardware H.264 encoder
     if (!x264enc) {
         cerr << "ERROR: x264 encoder element could not be created." << endl;
         gst_object_unref(pipeline);
