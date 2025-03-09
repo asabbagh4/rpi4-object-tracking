@@ -172,7 +172,7 @@ int main(int argc, char *argv[]) {
     videoconvert = gst_element_factory_make("videoconvert", "convert");
     videoscale = gst_element_factory_make("videoscale", "scale");
     capsfilter = gst_element_factory_make("capsfilter", "capsfilter");
-    x264enc = gst_element_factory_make("v4l2h264enc", "encoder");
+    x264enc = gst_element_factory_make("x264enc", "encoder");
     rtph264pay = gst_element_factory_make("rtph264pay", "payloader");
     udpsink = gst_element_factory_make("udpsink", "sink");
 
@@ -194,14 +194,10 @@ int main(int argc, char *argv[]) {
     gst_caps_unref(caps);
     
     if (x264enc) {
-        g_object_set(x264enc, "extra-controls", 
-                     gst_structure_new("controls",
-                                      "video_bitrate", G_TYPE_INT, bitrate * 1000,
-                                      "video_bitrate_mode", G_TYPE_INT, 1,
-                                      "repeat_sequence_header", G_TYPE_INT, 1,
-                                      "h264_profile", G_TYPE_INT, 1,
-                                      "h264_level", G_TYPE_INT, 12,
-                                      NULL), NULL);
+        g_object_set(x264enc, "bitrate", bitrate, NULL);
+        g_object_set(x264enc, "speed-preset", 1, NULL);  
+        g_object_set(x264enc, "key-int-max", 30, NULL);
+        g_object_set(x264enc, "threads", 4, NULL);
     }
     
     g_object_set(udpsink, "host", receiver_ip.c_str(), NULL);
@@ -234,6 +230,7 @@ int main(int argc, char *argv[]) {
 
     cout << "Starting video stream from " << video_device_path << " to " << receiver_ip << ":5000" << endl;
     cout << "Video settings: " << width << "x" << height << " @ " << framerate << "fps, " << bitrate << "kbps" << endl;
+    cout << "Using SOFTWARE encoding (x264enc)" << endl;
     
     ret = gst_element_set_state(pipeline, GST_STATE_PLAYING);
     if (ret == GST_STATE_CHANGE_FAILURE) {
