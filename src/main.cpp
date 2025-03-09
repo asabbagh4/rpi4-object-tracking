@@ -174,7 +174,7 @@ int main(int argc, char *argv[]) {
     udpsink = gst_element_factory_make("udpsink", "sink");
 
 
- if (!videosrc || !videoconvert || !videoscale || !capsfilter || !capsfilter2 ||
+    if (!videosrc || !videoconvert || !videoscale || !capsfilter || !capsfilter2 ||
         !x264enc || !rtph264pay || !udpsink) {
         cerr << "ERROR: Not all elements could be created." << endl;
         if (pipeline) gst_object_unref(pipeline);
@@ -198,4 +198,96 @@ int main(int argc, char *argv[]) {
                                   "height", G_TYPE_INT, height,
                                   "framerate", GST_TYPE_FRACTION, framerate, 1,
                                   NULL);
-    g_object
+    g_object_set(capsfilter, "caps", caps, NULL);
+    gst_caps_unref(caps);
+
+    // Set x264enc properties (bitrate, etc.)
+    g_object_set(x264enc, "bitrate", bitrate / 1000, NULL); // x264enc bitrate is in kbps
+    g_object_set(x264enc, "speed-preset", 1, NULL);    // ultrafast
+    g_object_set(x264enc, "tune", 4, NULL);           // zerolatency
+
+    // Set udpsink properties
+    g_object_set(udpsink, "host", receiver_ip.c_str(), NULL);
+    g_object_set(udpsink, "port", 5000, NULL);
+    g_object_set(udpsink, "sync", FALSE, NULL);
+
+    // Add elements to the pipeline
+    gst_bin_add_many(GST_BIN(pipeline), videosrc, capsfilter2, videoconvert, videoscale, capsfilter, x264enc, rtph264pay, udpsink, NULL);
+
+
+    // Link elements
+    if (!gst_element_link_many(videosrc, capsfilter2, videoconvert, videoscale, capsfilter, x264enc, rtph264pay, udpsink, NULL)) {
+        cerr << "ERROR: Elements could not be linked." << endl;
+        gst_object_unref(pipeline);
+        return -1;
+    }
+
+    // Set the pipeline state to playing
+    ret = gst_element_set_state(pipeline, GST_STATE_PLAYING);
+    if (ret == GST_STATE_CHANGE_FAILURE) {
+        cerr << "ERROR: Unable to set the pipeline to the playing state." << endl;
+        gst_object_unref(pipeline);
+        return -1;
+    }
+
+    cout << "Streaming... Press Ctrl+C to stop." << endl;
+
+    // Create a GLib Main Loop and set it up to handle messages
+    GMainLoop *loop = g_main_loop_new(NULL, FALSE);
+
+    // Watch for messages on the pipeline's bus
+    GstBus *bus = gst_element_get_bus(pipeline);
+    gst_bus_add_signal_watch(bus);
+
+    g_signal_connect_data(bus, "message", (GCallback)(+[](GstBus* bus, GstMessage* msg, gpointer data) -> gboolean {
+        GMainLoop *loop = (GMainLoop *)data;
+        GstElement* pipeline = (GstElement*)data; // Retrieve pipeline from user data
+
+        switch (GST_MESSAGE_TYPE(msg)) {
+            case GST_MESSAGE_ERROR: {
+                GError *err;
+                gchar *debug_info;
+                gst_message_parse_error(msg, &err, &debug_info);
+                cerr << "Error received from element " << GST_OBJECT_NAME(msg->src) << ": " << err->message << endl;
+                cerr << "Debugging information: " << (debug_info ? debug_info : "none") << endl;
+                g_clear_error(&err);
+                g_free(debug_info);
+                g_main_loop_quit(loop);
+                break;
+            }
+            case GST_MESSAGE_EOS:
+                cout << "End-Of-Stream reached." << endl;
+                g_main_loop_quit(loop);
+                break;
+            case GST_MESSAGE_STATE_CHANGED: {
+                GstState old_state, new_state, pending_state;
+                gst_message_parse_state_changed(msg, &old_state, &new_state, &pending_state);
+                 if (GST_MESSAGE_SRC(msg) == GST_OBJECT(pipeline)) {
+                      cout << "Pipeline state changed from " << gst_element_state_get_name(old_state)
+                           << " to " << gst_element_state_get_name(new_state) << endl;
+                 }
+                break;
+            }
+            default:
+                break;
+        }
+        return TRUE; // Keep watching for messages
+    }), pipeline, NULL, G_CONNECT_AFTER);  //Pass pipeline as user data
+    gst_object_unref(bus);
+
+    // Run the main loop
+    g_main_loop_run(loop);
+
+    // Free resources
+    cout << "Stopping pipeline..." << endl;
+    gst_element_set_state(pipeline, GST_STATE_NULL);
+    gst_object_unref(pipeline);
+    g_main_loop_unref(loop);
+    cout << "Pipeline stopped." << endl;
+
+    return 0;
+#else
+    cerr << "ERROR: GStreamer is not installed or configured correctly." << endl;
+    return -1;
+#endif
+}
