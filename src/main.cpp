@@ -147,7 +147,7 @@ int main(int argc, char *argv[]) {
     int width = 1280;
     int height = 720;
     int framerate = 30;
-    int bitrate = 2000;
+    int bitrate = 2000000; // Use a reasonable default, and set it directly.
 
     string video_device_path = find_rpi_camera();
     if (video_device_path.empty()) {
@@ -198,111 +198,4 @@ int main(int argc, char *argv[]) {
                                   "height", G_TYPE_INT, height,
                                   "framerate", GST_TYPE_FRACTION, framerate, 1,
                                   NULL);
-    g_object_set(capsfilter, "caps", caps, NULL);
-    gst_caps_unref(caps);
-
-
-  if (x264enc) {
-        g_object_set(x264enc, "extra-controls", 
-                     gst_structure_new("controls",
-                                      "video_bitrate", G_TYPE_INT, bitrate * 1000,
-                                      "video_bitrate_mode", G_TYPE_INT, 1,
-                                      "repeat_sequence_header", G_TYPE_BOOLEAN, TRUE, 
-                                       "h264_profile", G_TYPE_STRING, "high",
-                                     "h264_level", G_TYPE_STRING, "4.0",
-                                      NULL), NULL);
-    }
-    g_object_set(udpsink, "host", receiver_ip.c_str(), NULL);
-    g_object_set(udpsink, "port", 5000, NULL);
-    g_object_set(udpsink, "sync", FALSE, NULL);
-    g_object_set(udpsink, "async", FALSE, NULL);
-
-    gst_bin_add_many(GST_BIN(pipeline),
-                     videosrc,
-                     capsfilter2, // Add the new capsfilter here
-                     videoconvert,
-                     videoscale,
-                     capsfilter,
-                     x264enc,
-                     rtph264pay,
-                     udpsink,
-                     NULL);
-
-    if (!gst_element_link_many(videosrc,
-                              capsfilter2,  // Link v4l2src to the new capsfilter
-                              videoconvert,
-                              videoscale,
-                              capsfilter,
-                              x264enc,
-                              rtph264pay,
-                              udpsink,
-                              NULL)) {
-        cerr << "ERROR: Elements could not be linked." << endl;
-        gst_object_unref(pipeline);
-        return -1;
-    }
-
-
-    cout << "Starting video stream from " << video_device_path << " to " << receiver_ip << ":5000" << endl;
-    cout << "Video settings: " << width << "x" << height << " @ " << framerate << "fps, " << bitrate << "kbps" << endl;
-    cout << "Using SOFTWARE encoding (x264enc)" << endl;
-    ret = gst_element_set_state(pipeline, GST_STATE_PLAYING);
-    if (ret == GST_STATE_CHANGE_FAILURE) {
-        cerr << "ERROR: Unable to set the pipeline to the playing state." << endl;
-        gst_object_unref(pipeline);
-        return -1;
-    }
-    GstBus *bus = gst_element_get_bus(pipeline);
-    GstMessage *msg = NULL;
-    bool running = true;
-
-    cout << "Streaming... Press Ctrl+C to stop." << endl;
-
-    while (running) {
-        msg = gst_bus_timed_pop_filtered(bus, 100 * GST_MSECOND,
-            (GstMessageType)(GST_MESSAGE_ERROR | GST_MESSAGE_EOS | GST_MESSAGE_STATE_CHANGED));
-
-        if (msg != NULL) {
-            GError *err;
-            gchar *debug_info;
-
-            switch (GST_MESSAGE_TYPE(msg)) {
-                case GST_MESSAGE_ERROR:
-                    gst_message_parse_error(msg, &err, &debug_info);
-                    cerr << "ERROR from element " << GST_OBJECT_NAME(msg->src) << ": " << err->message << endl;
-                    cerr << "Debug info: " << (debug_info ? debug_info : "none") << endl;
-                    g_clear_error(&err);
-                    g_free(debug_info);
-                    running = false;
-                    break;
-
-                case GST_MESSAGE_EOS:
-                    cout << "End-Of-Stream reached." << endl;
-                    running = false;
-                    break;
-
-                case GST_MESSAGE_STATE_CHANGED:
-                    if (GST_MESSAGE_SRC(msg) == GST_OBJECT(pipeline)) {
-                        GstState old_state, new_state, pending_state;
-                        gst_message_parse_state_changed(msg, &old_state, &new_state, &pending_state);
-                        cout << "Pipeline state changed from " << gst_element_state_get_name(old_state)
-                             << " to " << gst_element_state_get_name(new_state) << endl;
-                    }
-                    break;
-
-                default:
-                    break;
-            }
-            gst_message_unref(msg);
-        }
-    }
-    gst_element_set_state(pipeline, GST_STATE_NULL);
-    gst_object_unref(pipeline);
-    gst_object_unref(bus);
-
-    return 0;
-#else
-    cerr << "GStreamer not found during compilation. Streaming is disabled." << endl;
-    return -1;
-#endif
-}
+    g_object
