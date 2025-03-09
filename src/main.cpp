@@ -88,8 +88,8 @@ int main(int argc, char *argv[]) {
     g_object_set(udpsink, "host", receiver_ip.c_str(), NULL); // Use the provided receiver's IP address
     g_object_set(udpsink, "port", 5000, NULL);      // Port for UDP streaming
 
-    g_object_set(x264enc, "bitrate", 500, NULL); // Bitrate in kbps
-    g_object_set(x264enc, "tune", "zerolatency", NULL); // Optimize for low latency
+    g_object_set(x264enc, "control-rate", 1, NULL);  // 1=constant bitrate
+    g_object_set(x264enc, "target-bitrate", 500000, NULL);  // 500 kbps (note: in bits/sec, not kbps)
 
 
     // Build the pipeline (link elements)
